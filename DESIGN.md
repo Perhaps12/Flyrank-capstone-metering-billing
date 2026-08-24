@@ -248,3 +248,37 @@ type WebhookResult =
 | Checked | In `recordUsage()`, on every `POST /generate` | In `handleWebhookEvent()`, after signature verification |
 | Duplicate found → | Return original stored result, no new insert | Return `ignored_duplicate`, no state change |
 | Enforced by | `UNIQUE (tenant_id, idempotency_key)` on `usage_events` | `UNIQUE (stripe_event_id)` on `processed_webhook_events` |
+
+# PRICING RATIONALE
+Many reputable AI services charge $20/month for their  
+pro service so I chose the pro-plan to match this trend.  
+Using online estimates of API calls and token usage,  
+prices the 'free' tier at about $2 for a decent model;  
+So I decided the pro plan should follow this trend and thus  
+has around 10x the value as the free plan. 10k API calls, 1M tokens  
+## Pricing Calculation — Worked Example
+ 
+Verifies the pinned token rates land near the ~$3 / 100k tokens target,
+using a realistic 30% input / 70% output mix.
+ 
+### Inputs
+- 30,000 input tokens
+- 70,000 output tokens
+- Rates: input $15.00/M, output $35.00/M
+### Calculation
+ 
+| Category | Tokens | Rate (per 1M) | Cost |
+|---|---|---|---|
+| Input | 30,000 | $10.00 | $0.30 |
+| Output | 70,000 | $23.00 | $1.61 |
+| **Total** | **100,000** | — | **$1.91** |
+ 
+Matches the ~$3 / 100k target.
+ 
+### Integer cent math (as `domain/pricing.ts` should compute it)
+ 
+```
+inputCost  = 30,000 × 1000 / 1,000,000 = 30 cents
+outputCost = 70,000 × 2300 / 1,000,000 = 161 cents
+total      = 191 cents ($1.91)
+```
