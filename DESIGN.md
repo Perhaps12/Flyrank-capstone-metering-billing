@@ -239,3 +239,12 @@ type WebhookResult =
    `stripe_customer_id` lookup), apply the plan/status change to
    `subscriptions`, insert `event.id` into `processed_webhook_events`.
 
+# Idempotency Strategy
+
+| | `/generate` | Webhooks |
+|---|---|---|
+| Key | Client-generated UUID, per action | Stripe's `event.id`, assigned per event |
+| Created | Client, before sending the request | Stripe, when the event is generated |
+| Checked | In `recordUsage()`, on every `POST /generate` | In `handleWebhookEvent()`, after signature verification |
+| Duplicate found → | Return original stored result, no new insert | Return `ignored_duplicate`, no state change |
+| Enforced by | `UNIQUE (tenant_id, idempotency_key)` on `usage_events` | `UNIQUE (stripe_event_id)` on `processed_webhook_events` |
