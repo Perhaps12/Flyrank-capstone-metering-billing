@@ -26,8 +26,7 @@ function mapRow(row: any): UsageEvent {
   };
 }
 
-// Looked up first on every /generate call, before inserting anything —
-// this is the read side of the idempotency check.
+// Looked up first on every /generate call, before inserting anything
 export async function findByIdempotencyKey(
   tenantId: number,
   idempotencyKey: string
@@ -43,10 +42,7 @@ export async function findByIdempotencyKey(
 }
 
 // Inserts a new usage event. Relies on the UNIQUE (tenant_id, idempotency_key)
-// constraint as the actual race-condition-proof enforcement — callers should
-// still check findByIdempotencyKey first to avoid unnecessary constraint
-// violations, but this insert is what makes the guarantee airtight even
-// under concurrent requests with the same key.
+// constraint along with idempotency checks by caller functions to avoid double-counting
 export async function insertUsageEvent(params: {
   tenantId: number;
   idempotencyKey: string;
@@ -83,11 +79,7 @@ export interface UsageSummary {
   reasoningTokens: number;
 }
 
-// Sums all usage for a tenant since a given timestamp (typically the
-// start of the current billing period). Used by both quota checks and
-// the GET /usage rollup — the single source of truth for "how much has
-// this tenant used," derived from the event log rather than a cached
-// balance.
+// Sums all usage for a tenant since a given timestamp (usually the start of the billing period))
 export async function sumUsageForPeriod(
   tenantId: number,
   since: Date

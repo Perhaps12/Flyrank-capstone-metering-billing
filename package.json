@@ -18,6 +18,7 @@
   },
   "scripts": {
     "dev": "nodemon --exec tsx src/index.ts",
-    "seed:plans": "tsx src/database/seeds/seedPlans.ts"
+    "seed:plans": "tsx src/database/seeds/seedPlans.ts",
+    "seed:tenants": "tsx src/database/seeds/seedTenants.ts"
   }
 }

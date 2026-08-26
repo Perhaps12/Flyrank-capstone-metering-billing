@@ -40,9 +40,7 @@ function mapSubscriptionRow(row: any): Subscription {
   };
 }
 
-// Returns the plan currently active for a tenant — used by quota checks.
-// Joins through subscriptions -> plans, since a tenant's limits are
-// determined by whichever plan their subscription currently points to.
+// Returns the plan currently active for a tenant
 export async function getPlanForTenant(tenantId: number): Promise<Plan | null> {
   const result = await pool.query(
     `SELECT p.id, p.name, p.api_call_limit, p.ai_token_limit, p.price_cents

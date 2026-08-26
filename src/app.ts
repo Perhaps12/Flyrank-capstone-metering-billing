@@ -1,5 +1,7 @@
 import express from "express";
 import metaRoutes from "./routes/meta";
+import { mockAuth } from "./middleware/mockAuth";
+
 
 const app = express();
 

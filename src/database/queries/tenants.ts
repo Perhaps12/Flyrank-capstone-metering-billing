@@ -18,9 +18,9 @@ function mapRow(row: any): Tenant {
   };
 }
 
-// Resolves a tenant from their api_key. Used by mockAuth middleware —
-// tenant identity should always come from this, never from a client-
-// supplied tenant_id in the request body.
+// Resolves a tenant from their api_key. Used by mockAuth middleware to simulate a JVM auth flow.
+// In this project we hardcode tenants and api_keys but in real production you would use the temporary keys generated during auth
+// tenantID is never supplied directly in the request body; this is the only way to resolve a tenant.
 export async function findTenantByApiKey(apiKey: string): Promise<Tenant | null> {
   const result = await pool.query(
     `SELECT id, public_id, api_key, name, created_at
