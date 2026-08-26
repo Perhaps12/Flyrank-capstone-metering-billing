@@ -26,7 +26,8 @@ function mapRow(row: any): UsageEvent {
   };
 }
 
-// Looked up first on every /generate call, before inserting anything
+// Looked up first on every /generate call, before inserting anything —
+// this is the read side of the idempotency check.
 export async function findByIdempotencyKey(
   tenantId: number,
   idempotencyKey: string
@@ -42,7 +43,10 @@ export async function findByIdempotencyKey(
 }
 
 // Inserts a new usage event. Relies on the UNIQUE (tenant_id, idempotency_key)
-// constraint along with idempotency checks by caller functions to avoid double-counting
+// constraint as the actual race-condition-proof enforcement — callers should
+// still check findByIdempotencyKey first to avoid unnecessary constraint
+// violations, but this insert is what makes the guarantee airtight even
+// under concurrent requests with the same key.
 export async function insertUsageEvent(params: {
   tenantId: number;
   idempotencyKey: string;
@@ -79,7 +83,39 @@ export interface UsageSummary {
   reasoningTokens: number;
 }
 
-// Sums all usage for a tenant since a given timestamp (usually the start of the billing period))
+// Sums usage since the start of the current calendar month, computed
+// entirely within the SQL itself (date_trunc('month', now())) rather
+// than passing a JS-computed Date — avoids any dependency on the app
+// server's clock matching the database's clock. Used by quota checks
+// and the GET /usage rollup.
+export async function sumUsageForCurrentPeriod(
+  tenantId: number
+): Promise<UsageSummary> {
+  const result = await pool.query(
+    `SELECT
+       COALESCE(SUM(api_calls), 0)::int AS api_calls,
+       COALESCE(SUM(input_tokens), 0)::int AS input_tokens,
+       COALESCE(SUM(cached_input_tokens), 0)::int AS cached_input_tokens,
+       COALESCE(SUM(output_tokens), 0)::int AS output_tokens,
+       COALESCE(SUM(reasoning_tokens), 0)::int AS reasoning_tokens
+     FROM usage_events
+     WHERE tenant_id = $1 AND created_at >= date_trunc('month', now())`,
+    [tenantId]
+  );
+  const row = result.rows[0];
+  return {
+    apiCalls: row.api_calls,
+    inputTokens: row.input_tokens,
+    cachedInputTokens: row.cached_input_tokens,
+    outputTokens: row.output_tokens,
+    reasoningTokens: row.reasoning_tokens,
+  };
+}
+
+// Sums all usage for a tenant since a given timestamp. Useful for tests
+// and ad-hoc rollups; prefer sumUsageForCurrentPeriod for quota checks
+// and the standard monthly usage report, since it avoids passing a
+// JS-computed timestamp across the app/database boundary.
 export async function sumUsageForPeriod(
   tenantId: number,
   since: Date
