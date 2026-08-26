@@ -20,9 +20,9 @@ src/
     connection.ts          # Postgres connection setup
     migrations/            # versioned schema changes
     queries/
-        tenants.ts         # getTenantByApiKey, createTenant
-        usageEvents.ts     # insertUsageEvent, sumUsageForTenant, findByIdempotencyKey
-        subscriptions.ts   # updateTenantPlan, getSubscriptionByStripeCustomerId
+        tenants.ts         # findTenantByApiKey, createTenant, findTenantById
+        usageEvents.ts     # insertUsageEvent, sumUsageForPeriod, findByIdempotencyKey
+        subscriptions.ts   # updateTenantPlan, findTenantIdByStripeCustomerId, createSubscription, getPlanForTenant
         webhookEvents.ts   # hasProcessedEvent, markEventProcessed
 
   middleware/

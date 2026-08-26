@@ -8,5 +8,8 @@ Etablished basic backend code and setup the docker + container
 ### 2026-08-25
 Created the relevant database functions including queries, connections to docker, and seeded values
 
-
+### 2026-08-26
+Began testing upon database queries  
+Claude recommended the jest library for this; verified & used a testing script created by claude  
+Wrote down download instructions in ReadMe + included design intentions about middleware  
 

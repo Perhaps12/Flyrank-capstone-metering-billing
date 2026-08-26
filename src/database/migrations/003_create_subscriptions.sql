@@ -5,5 +5,5 @@ CREATE TABLE subscriptions (
   stripe_customer_id TEXT,
   stripe_subscription_id TEXT,
   status TEXT NOT NULL DEFAULT 'active',
-  updated_at TIMESTAMP DEFAULT now()
+  updated_at TIMESTAMPTZ DEFAULT now()
 );

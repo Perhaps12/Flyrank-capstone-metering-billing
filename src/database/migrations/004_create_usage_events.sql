@@ -7,6 +7,6 @@ CREATE TABLE usage_events (
   cached_input_tokens INT NOT NULL DEFAULT 0,
   output_tokens INT NOT NULL DEFAULT 0,
   reasoning_tokens INT NOT NULL DEFAULT 0,
-  created_at TIMESTAMP DEFAULT now(),
+  created_at TIMESTAMPTZ DEFAULT now(),
   UNIQUE (tenant_id, idempotency_key)
 );

@@ -9,16 +9,23 @@
   },
   "devDependencies": {
     "@types/express": "^5.0.6",
+    "@types/jest": "^30.0.0",
     "@types/node": "^26.3.0",
     "@types/pg": "^8.23.1",
     "@types/uuid": "^10.0.0",
+    "jest": "^30.4.2",
     "nodemon": "^3.1.14",
+    "ts-jest": "^29.4.12",
     "tsx": "^4.23.12",
-    "typescript": "^7.0.2"
+    "typescript": "5.4"
   },
   "scripts": {
     "dev": "nodemon --exec tsx src/index.ts",
+    "test": "jest",
+    "migrate": "tsx src/database/migrate.ts",
     "seed:plans": "tsx src/database/seeds/seedPlans.ts",
-    "seed:tenants": "tsx src/database/seeds/seedTenants.ts"
+    "seed:tenants": "tsx src/database/seeds/seedTenants.ts",
+    "seed": "npm run seed:plans && npm run seed:tenants",
+    "setup": "docker compose up -d --wait && npm run migrate && npm run seed"
   }
 }
