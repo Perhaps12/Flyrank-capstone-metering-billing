@@ -17,6 +17,7 @@
     "typescript": "^7.0.2"
   },
   "scripts": {
-    "dev": "nodemon --exec tsx src/index.ts"
+    "dev": "nodemon --exec tsx src/index.ts",
+    "seed:plans": "tsx src/database/seeds/seedPlans.ts"
   }
 }
