@@ -16,4 +16,11 @@ Wrote down download instructions in ReadMe + included design intentions about mi
 ## PHASE 2  
 ### 2026-08-26  
 Added core logic to calculate and compare call/token usages along with computing costs  
-Used AI + jest to create a seperate domain/ test file
+Used AI + jest to create a seperate domain/ test file  
+  
+Idempotency on call/token usage implemented on 2 levels:
+- ```sql UNIQUE (tenant_id, idempotency_key)``` on the usageEvents table rejects any addition which matches both those categories
+- ```domain/metering.ts``` moniters whenever a usage event tries to be inserted and manages the case where 2 of the same request are sent at the same time  
+  
+Subscription idempotency to be added via webhooks
+
