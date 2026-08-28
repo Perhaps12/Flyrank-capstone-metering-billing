@@ -29,13 +29,24 @@ cp .env.example .env
 ```bash
 npm run setup
 ```
-This starts Postgres in Docker, runs all migrations in order, and seeds
-plans + test tenants. Equivalent to running each step manually:
+This starts Postgres in Docker, runs all migrations in order, and seeds the
+plans used by the application. Test tenants are optional and can be added
+after setup with `npm run seed`. Equivalent to running the setup steps
+manually:
 ```bash
 docker compose up -d
 npm run migrate
+npm run seed:plans
+```
+
+To add the test tenants used by the example `curl` commands, run:
+
+```bash
 npm run seed
 ```
+
+This is equivalent to `npm run seed:tenants` and requires `npm run setup` (or
+`npm run seed:plans`) to have been run first.
 
 ### 4. Start the server
 ```bash

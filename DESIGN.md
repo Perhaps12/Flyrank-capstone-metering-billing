@@ -54,7 +54,7 @@ CREATE TABLE tenants (
   public_id UUID DEFAULT gen_random_uuid() UNIQUE,   -- safe external reference, if ever needed
   api_key TEXT UNIQUE NOT NULL,                       -- mock auth credential, resolved by middleware
   name TEXT NOT NULL,
-  created_at TIMESTAMP DEFAULT now()
+  created_at TIMESTAMPTZ DEFAULT now()
 );
 
 -- ============================================
@@ -78,7 +78,7 @@ CREATE TABLE subscriptions (
   stripe_customer_id TEXT,
   stripe_subscription_id TEXT,
   status TEXT NOT NULL DEFAULT 'active',   -- active | canceled | past_due, etc.
-  updated_at TIMESTAMP DEFAULT now()
+  updated_at TIMESTAMPTZ DEFAULT now()
 );
 
 -- ============================================
@@ -93,7 +93,7 @@ CREATE TABLE usage_events (
   cached_input_tokens INT NOT NULL DEFAULT 0,
   output_tokens INT NOT NULL DEFAULT 0,
   reasoning_tokens INT NOT NULL DEFAULT 0,
-  created_at TIMESTAMP DEFAULT now(),
+  created_at TIMESTAMPTZ DEFAULT now(),
   UNIQUE (tenant_id, idempotency_key)
 );
 
@@ -103,7 +103,7 @@ CREATE TABLE usage_events (
 CREATE TABLE processed_webhook_events (
   id SERIAL PRIMARY KEY,
   stripe_event_id TEXT NOT NULL UNIQUE,
-  processed_at TIMESTAMP DEFAULT now()
+  processed_at TIMESTAMPTZ DEFAULT now()
 );
 ```
 
@@ -258,13 +258,16 @@ So I decided the pro plan should follow this trend and thus
 has around 10x the value as the free plan. 10k API calls, 1M tokens  
 ## Pricing Calculation — Worked Example
  
-Verifies the pinned token rates land near the ~$3 / 100k tokens target,
-using a realistic 30% input / 70% output mix.
+Verifies the pinned token rates land near the ~$1.90 / 100k tokens target,
+using a realistic 30% input / 70% output mix. This is the canonical
+pricing test case.
  
 ### Inputs
 - 30,000 input tokens
 - 70,000 output tokens
-- Rates: input $15.00/M, output $35.00/M
+- Rates: input $10.00/M, output $23.00/M (cached input $5.00/M, 50% of
+  input rate; reasoning tokens billed at the output rate — see
+  `config/pricing.ts`)
 ### Calculation
  
 | Category | Tokens | Rate (per 1M) | Cost |
@@ -273,7 +276,8 @@ using a realistic 30% input / 70% output mix.
 | Output | 70,000 | $23.00 | $1.61 |
 | **Total** | **100,000** | — | **$1.91** |
  
-Matches the ~$3 / 100k target.
+Matches the ~$1.90 / 100k target: Pro's included 1M tokens/month ≈ costs
+the $20 subscription price if priced à la carte.
  
 ### Integer cent math (as `domain/pricing.ts` should compute it)
  

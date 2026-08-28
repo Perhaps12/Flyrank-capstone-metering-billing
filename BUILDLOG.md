@@ -24,3 +24,13 @@ Idempotency on call/token usage implemented on 2 levels:
   
 Subscription idempotency to be added via webhooks
 
+Implemented the POST /generate route  
+
+### 2026-08-27
+Additional testing implemented and passed
+Populated EVIDENCE.md with real examples
+
+## PHASE 3
+### 2026-08-27
+Configured stripe account and downloaded necessary packages
+Established the billing routes, webhook connections and stripe services
