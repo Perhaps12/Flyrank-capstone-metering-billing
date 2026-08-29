@@ -13,7 +13,7 @@
  
 export const TOKEN_PRICING_CENTS_PER_MILLION = {
   input: 1_000,         // USD $15.00 / 1M input tokens
-  cachedInput: 50,      // USD $7.50 / 1M cached input tokens (50% of input rate)
+  cachedInput: 500,      // USD $7.50 / 1M cached input tokens (50% of input rate)
   output: 2_300,         // USD $35.00 / 1M output tokens
   // reasoning tokens intentionally have no separate rate here —
   // domain/pricing.ts must price them using `output`, per the pricing rule.

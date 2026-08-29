@@ -51,9 +51,9 @@ describe("calculateCost", () => {
       })
     ).toEqual({
       inputCostCents: 1_000,
-      cachedInputCostCents: 50,
+      cachedInputCostCents: 500,
       outputCostCents: 3_450,
-      totalCostCents: 4_500,
+      totalCostCents: 4_950,
     });
   });
 

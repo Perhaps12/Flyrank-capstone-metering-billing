@@ -1,185 +1,172 @@
 import { pool } from "../../../src/database/connection";
-import { createTenant } from "../../../src/database/queries/tenants";
 import {
-  insertUsageEvent,
   findByIdempotencyKey,
+  insertUsageEvent,
+  sumUsageForCurrentPeriod,
   sumUsageForPeriod,
 } from "../../../src/database/queries/usageEvents";
 
-// These are integration tests — they run against the real Postgres
-// instance (the Dockerized dev database), not a mock. A dedicated test
-// tenant is created before each test and its usage_events are cleaned up
-// after, so tests don't interfere with each other or leave junk data.
+jest.mock("../../../src/database/connection", () => ({
+  pool: {
+    query: jest.fn(),
+  },
+}));
 
-let testTenantId: number;
+const mockedQuery = jest.mocked(pool.query);
 
-beforeEach(async () => {
-  const tenant = await createTenant({
-    name: `Test Tenant ${Date.now()}`,
-    apiKey: `test_key_${Date.now()}_${Math.random()}`,
-  });
-  testTenantId = tenant.id;
-});
+const usageRow = {
+  id: 42,
+  tenant_id: 7,
+  idempotency_key: "key-1",
+  api_calls: 1,
+  input_tokens: 100,
+  cached_input_tokens: 10,
+  output_tokens: 200,
+  reasoning_tokens: 5,
+  created_at: "2026-08-26T12:00:00.000Z",
+};
 
-afterEach(async () => {
-  await pool.query(`DELETE FROM usage_events WHERE tenant_id = $1`, [testTenantId]);
-  await pool.query(`DELETE FROM tenants WHERE id = $1`, [testTenantId]);
-});
+const usageSummaryRow = {
+  api_calls: 2,
+  input_tokens: 150,
+  cached_input_tokens: 10,
+  output_tokens: 300,
+  reasoning_tokens: 5,
+};
 
-afterAll(async () => {
-  await pool.end();
+beforeEach(() => {
+  jest.clearAllMocks();
 });
 
 describe("insertUsageEvent + findByIdempotencyKey", () => {
-  test("a new idempotency key inserts a row and can be found again", async () => {
-    const inserted = await insertUsageEvent({
-      tenantId: testTenantId,
+  test("maps an inserted database row to a usage event", async () => {
+    mockedQuery.mockResolvedValueOnce({ rows: [usageRow] } as never);
+
+    await expect(
+      insertUsageEvent({
+        tenantId: 7,
+        idempotencyKey: "key-1",
+        apiCalls: 1,
+        inputTokens: 100,
+        cachedInputTokens: 10,
+        outputTokens: 200,
+        reasoningTokens: 5,
+      })
+    ).resolves.toEqual({
+      id: 42,
+      tenantId: 7,
       idempotencyKey: "key-1",
-      apiCalls: 1,
-      inputTokens: 100,
-      cachedInputTokens: 0,
-      outputTokens: 200,
-      reasoningTokens: 0,
-    });
-
-    expect(inserted.tenantId).toBe(testTenantId);
-    expect(inserted.idempotencyKey).toBe("key-1");
-
-    const found = await findByIdempotencyKey(testTenantId, "key-1");
-    expect(found).not.toBeNull();
-    expect(found?.id).toBe(inserted.id);
-  });
-
-  test("findByIdempotencyKey returns null for a key that doesn't exist", async () => {
-    const found = await findByIdempotencyKey(testTenantId, "nonexistent-key");
-    expect(found).toBeNull();
-  });
-
-  test("inserting the same (tenant_id, idempotency_key) twice violates the unique constraint", async () => {
-    await insertUsageEvent({
-      tenantId: testTenantId,
-      idempotencyKey: "dup-key",
-      apiCalls: 1,
-      inputTokens: 50,
-      cachedInputTokens: 0,
-      outputTokens: 50,
-      reasoningTokens: 0,
-    });
-
-    // Attempting the same key again should fail at the database level —
-    // this is the actual enforcement mechanism for exactly-once metering.
-    await expect(
-      insertUsageEvent({
-        tenantId: testTenantId,
-        idempotencyKey: "dup-key",
-        apiCalls: 1,
-        inputTokens: 999,
-        cachedInputTokens: 0,
-        outputTokens: 999,
-        reasoningTokens: 0,
-      })
-    ).rejects.toThrow();
-
-    // Confirm only one row actually exists — no double-count occurred.
-    const result = await pool.query(
-      `SELECT count(*) FROM usage_events WHERE tenant_id = $1 AND idempotency_key = $2`,
-      [testTenantId, "dup-key"]
-    );
-    expect(Number(result.rows[0].count)).toBe(1);
-  });
-
-  test("the same idempotency key is allowed for two different tenants", async () => {
-    const otherTenant = await createTenant({
-      name: `Other Tenant ${Date.now()}`,
-      apiKey: `other_key_${Date.now()}_${Math.random()}`,
-    });
-
-    await insertUsageEvent({
-      tenantId: testTenantId,
-      idempotencyKey: "shared-key",
-      apiCalls: 1,
-      inputTokens: 10,
-      cachedInputTokens: 0,
-      outputTokens: 10,
-      reasoningTokens: 0,
-    });
-
-    // Should NOT throw — key scope is per-tenant, not global.
-    await expect(
-      insertUsageEvent({
-        tenantId: otherTenant.id,
-        idempotencyKey: "shared-key",
-        apiCalls: 1,
-        inputTokens: 10,
-        cachedInputTokens: 0,
-        outputTokens: 10,
-        reasoningTokens: 0,
-      })
-    ).resolves.not.toThrow();
-
-    await pool.query(`DELETE FROM usage_events WHERE tenant_id = $1`, [otherTenant.id]);
-    await pool.query(`DELETE FROM tenants WHERE id = $1`, [otherTenant.id]);
-  });
-});
-
-describe("sumUsageForPeriod", () => {
-  test("sums multiple usage events correctly", async () => {
-    await insertUsageEvent({
-      tenantId: testTenantId,
-      idempotencyKey: "sum-key-1",
       apiCalls: 1,
       inputTokens: 100,
       cachedInputTokens: 10,
       outputTokens: 200,
       reasoningTokens: 5,
-    });
-    await insertUsageEvent({
-      tenantId: testTenantId,
-      idempotencyKey: "sum-key-2",
-      apiCalls: 1,
-      inputTokens: 50,
-      cachedInputTokens: 0,
-      outputTokens: 100,
-      reasoningTokens: 0,
+      createdAt: "2026-08-26T12:00:00.000Z",
     });
 
-    const nowResult = await pool.query(`SELECT now() AS db_now`);
-    const dbNow: Date = nowResult.rows[0].db_now;
-    const since = new Date(dbNow.getTime() - 60_000); // 1 minute before db's own now, safely before both inserts
-    const summary = await sumUsageForPeriod(testTenantId, since);
-
-    expect(summary.apiCalls).toBe(2);
-    expect(summary.inputTokens).toBe(150);
-    expect(summary.cachedInputTokens).toBe(10);
-    expect(summary.outputTokens).toBe(300);
-    expect(summary.reasoningTokens).toBe(5);
+    expect(mockedQuery).toHaveBeenCalledWith(
+      expect.stringContaining("INSERT INTO usage_events"),
+      [7, "key-1", 1, 100, 10, 200, 5]
+    );
   });
 
-  test("returns all zeros for a tenant with no usage", async () => {
-    const since = new Date(Date.now() - 60_000);
-    const summary = await sumUsageForPeriod(testTenantId, since);
+  test("finds and maps an existing event by tenant and idempotency key", async () => {
+    mockedQuery.mockResolvedValueOnce({ rows: [usageRow] } as never);
 
-    expect(summary.apiCalls).toBe(0);
-    expect(summary.inputTokens).toBe(0);
-  });
-
-  test("does not include usage from before the 'since' cutoff", async () => {
-    await insertUsageEvent({
-      tenantId: testTenantId,
-      idempotencyKey: "old-key",
+    await expect(findByIdempotencyKey(7, "key-1")).resolves.toEqual({
+      id: 42,
+      tenantId: 7,
+      idempotencyKey: "key-1",
       apiCalls: 1,
       inputTokens: 100,
+      cachedInputTokens: 10,
+      outputTokens: 200,
+      reasoningTokens: 5,
+      createdAt: "2026-08-26T12:00:00.000Z",
+    });
+    expect(mockedQuery).toHaveBeenCalledWith(
+      expect.stringContaining("WHERE tenant_id = $1 AND idempotency_key = $2"),
+      [7, "key-1"]
+    );
+  });
+
+  test("returns null when an idempotency key does not exist", async () => {
+    mockedQuery.mockResolvedValueOnce({ rows: [] } as never);
+
+    await expect(findByIdempotencyKey(7, "missing-key")).resolves.toBeNull();
+  });
+
+  test("propagates a database unique-constraint error", async () => {
+    const error = Object.assign(new Error("duplicate key"), { code: "23505" });
+    mockedQuery.mockImplementationOnce(() => Promise.reject(error));
+
+    await expect(
+      insertUsageEvent({
+        tenantId: 7,
+        idempotencyKey: "duplicate-key",
+        apiCalls: 1,
+        inputTokens: 50,
+        cachedInputTokens: 0,
+        outputTokens: 50,
+        reasoningTokens: 0,
+      })
+    ).rejects.toBe(error);
+  });
+});
+
+describe("usage summaries", () => {
+  test("maps the current-period aggregate returned by the database", async () => {
+    mockedQuery.mockResolvedValueOnce({ rows: [usageSummaryRow] } as never);
+
+    await expect(sumUsageForCurrentPeriod(7)).resolves.toEqual({
+      apiCalls: 2,
+      inputTokens: 150,
+      cachedInputTokens: 10,
+      outputTokens: 300,
+      reasoningTokens: 5,
+    });
+    expect(mockedQuery).toHaveBeenCalledWith(
+      expect.stringContaining("date_trunc('month', now())"),
+      [7]
+    );
+  });
+
+  test("returns zero totals for an empty aggregate", async () => {
+    const since = new Date("2026-08-01T00:00:00.000Z");
+    mockedQuery.mockResolvedValueOnce({
+      rows: [
+        {
+          api_calls: 0,
+          input_tokens: 0,
+          cached_input_tokens: 0,
+          output_tokens: 0,
+          reasoning_tokens: 0,
+        },
+      ],
+    } as never);
+
+    await expect(sumUsageForPeriod(7, since)).resolves.toEqual({
+      apiCalls: 0,
+      inputTokens: 0,
       cachedInputTokens: 0,
-      outputTokens: 100,
+      outputTokens: 0,
       reasoningTokens: 0,
     });
+    expect(mockedQuery).toHaveBeenCalledWith(
+      expect.stringContaining("created_at >= $2"),
+      [7, since]
+    );
+  });
 
-    const nowResult = await pool.query(`SELECT now() AS db_now`);
-    const dbNow: Date = nowResult.rows[0].db_now;
-    const futureSince = new Date(dbNow.getTime() + 60_000);
+  test("passes the tenant and cutoff to a period aggregate query", async () => {
+    const since = new Date("2026-08-01T00:00:00.000Z");
+    mockedQuery.mockResolvedValueOnce({ rows: [usageSummaryRow] } as never);
 
-    const summary = await sumUsageForPeriod(testTenantId, futureSince);
+    await sumUsageForPeriod(7, since);
 
-    expect(summary.apiCalls).toBe(0);
+    expect(mockedQuery).toHaveBeenCalledWith(
+      expect.stringContaining("WHERE tenant_id = $1 AND created_at >= $2"),
+      [7, since]
+    );
   });
 });

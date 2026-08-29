@@ -36,14 +36,58 @@ npm test -- --runInBand tests/domain/domain.test.ts
 ![alt text](domainTests.png)
 
 # COST CALCULATION
-- [x] Monthly usage rolls up into a cost figure per tenant.
+- [x] Monthly usage rolls up into a cost figure per tenant.  
+```
+$ curl -i -X POST http://localhost:3000/generate -H "Authorization: Bearer test_pro_key_456" -H "Content-Type: application/json" -H "Idempotency-Key: pricing-evidence-3" -d '{"inputTokens": 30000, "outputTokens": 70000}'
+HTTP/1.1 201 Created
+{"usageEventId":21,"wasDuplicate":false,"inputTokens":30000,"outputTokens":70000,"costCents":191,...}
+
+$ curl -i http://localhost:3000/usage -H "Authorization: Bearer test_pro_key_456"
+HTTP/1.1 200 OK
+{"plan":"pro","tokens":{"used":100000,"breakdown":{"input":30000,"output":70000,...}},"costCents":191}
+```
+Tokens used add up to 191 cents as intended
 - [x] AI token pricing handles cached input tokens, reasoning tokens, and output pricing correctly.
+```
+$ curl -i -X POST http://localhost:3000/generate -H "Authorization: Bearer test_pro_key_456" -H "Content-Type: application/json" -H "Idempotency-Key: pricing-evidence-cached2" -d '{"cachedInputTokens": 40000, "outputTokens": 10000}'
+HTTP/1.1 201 Created
+{"usageEventId":23,"wasDuplicate":false,"cachedInputTokens":40000,"outputTokens":10000,"costCents":43,...}
+```
+Tokens used add up to 43 cents as intended
 - [x] Pricing constants are pinned and covered by tests.  
-Via docker-desktop
+Via docker-desktop  
 ![alt text](planPrices.png)
 # STRIPE INTEGRATION
-- [ ] Subscription checkout works end-to-end in Stripe test mode.
-- [ ] Webhooks verify signatures, ignore duplicate events, and update tenant plan/status.
+- [x] Subscription checkout works end-to-end in Stripe test mode.
+```
+npm.cmd test -- --runInBand tests/routes/stripe.test.ts
+```
+![alt text](stripeTest.png)
+- [x] Webhooks verify signatures, ignore duplicate events, and update tenant plan/status.
+Signature verification (forged webhook rejected):
+ 
+```
+$ curl -i -X POST http://localhost:3000/webhooks/stripe -H "Content-Type: application/json" -H "Stripe-Signature: t=1,v1=deadbeef" -d "{\"id\":\"evt_fake\",\"type\":\"checkout.session.completed\"}"
+HTTP/1.1 400 Bad Request
+{"error":"Invalid Stripe webhook signature"}
+```
+ 
+Duplicate event ignored (same event ID replayed via `stripe events resend`):
+ 
+```
+Stripe webhook processed: { eventId: 'evt_1U9EDZR5N7KjhhoEMr4tt9wN', eventType: 'checkout.session.completed', result: { status: 'processed', tenantId: 1, newPlan: 'pro' } }
+Stripe webhook processed: { eventId: 'evt_1U9EDZR5N7KjhhoEMr4tt9wN', eventType: 'checkout.session.completed', result: { status: 'ignored_duplicate' } }
+```
+ 
+Plan/status updated (before checkout vs. after):
+ 
+```
+$ curl -i http://localhost:3000/usage -H "Authorization: Bearer test_free_key_123"
+{"plan":"free","apiCalls":{"used":1000,"limit":1000},"tokens":{"used":300,"limit":100000},"costCents":0}
+ 
+$ curl -i http://localhost:3000/usage -H "Authorization: Bearer test_free_key_123"
+{"plan":"pro","apiCalls":{"used":1000,"limit":10000},"tokens":{"used":300,"limit":1000000},"costCents":0}
+```
 # DATA MODEL, TESTS & DOCUMENTATION
 - [x] Database includes tenants, plans, subscriptions, and usage events; customer data isolated per tenant.  
 Via docker-desktop:  

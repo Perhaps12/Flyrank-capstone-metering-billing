@@ -34,3 +34,11 @@ Populated EVIDENCE.md with real examples
 ### 2026-08-27
 Configured stripe account and downloaded necessary packages
 Established the billing routes, webhook connections and stripe services
+
+### 2026-08-28
+Metering tests & billing created and passed
+
+## PHASE 4
+### 2026-08-29
+Working on finalising EVIDENCE + README
+Fixed some bugs involving pricing
