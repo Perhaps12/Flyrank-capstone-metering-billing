@@ -98,4 +98,4 @@ Via docker-desktop:
 npm test -- --runInBand metering.test.ts
 ```
 ![alt text](POSTgenerationTests.png)
-- [ ] README + architecture diagram + setup instructions; submission-pack files from § 11 present.
+- [x] README + architecture diagram + setup instructions; submission-pack files from § 11 present.
